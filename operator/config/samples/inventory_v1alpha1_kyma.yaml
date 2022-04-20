@@ -4,3 +4,4 @@ metadata:
   name: kyma-sample
 spec:
   # TODO(user): Add fields here
+  foo: DontKnowWhatIamDoing

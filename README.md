@@ -20,3 +20,8 @@ Steps:
 
 4) Push changes to github
 
+5) Write the code that adds integration with IstioConfiguration objects
+- Create of Kyma object should result in creation of IstioConfiguration
+- Delete of Kyma object should result in deletion of related IstioConfiguration (if any)
+
+

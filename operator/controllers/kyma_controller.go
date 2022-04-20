@@ -19,12 +19,13 @@ package controllers
 import (
 	"context"
 
+	istioOperatorApi "github.com/Tomasz-Smelcerz-SAP/kyma-operator-istio/k8s-api/api/v1alpha1"
+	inventoryv1alpha1 "github.com/Tomasz-Smelcerz-SAP/kyma-operator-mothership/operator/api/v1alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	inventoryv1alpha1 "github.com/Tomasz-Smelcerz-SAP/kyma-operator-mothership/operator/api/v1alpha1"
 )
 
 // KymaReconciler reconciles a Kyma object
@@ -47,9 +48,55 @@ type KymaReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.11.0/pkg/reconcile
 func (r *KymaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	obj := inventoryv1alpha1.Kyma{}
+	err := r.Client.Get(ctx, req.NamespacedName, &obj)
+	if apierrors.IsNotFound(err) {
+		//object is deleted
+		logger.Info("Object is deleted:", "object", req.NamespacedName)
+
+		//try to delete related IstioConfiguration object
+		istioObject := istioOperatorApi.IstioConfiguration{}
+		istioObject.Name = req.Name
+		istioObject.Namespace = req.Namespace
+
+		err = r.Client.Delete(ctx, &istioObject)
+		if apierrors.IsNotFound(err) {
+			//IstioConfiguration does not exist. Success.
+			return ctrl.Result{}, nil
+		}
+		if err != nil {
+			logger.Error(err, "Error during IstioConfiguration delete")
+			return ctrl.Result{}, err
+		}
+		logger.Info("Successfully deleted IstioConfiguration:", "object:", istioObject)
+
+		return ctrl.Result{}, nil
+	}
+
+	if err != nil {
+		logger.Error(err, "Error during reconciliation")
+		return ctrl.Result{}, err
+	}
+
+	importantValue := obj.Spec.Foo
+
+	istioObject := istioOperatorApi.IstioConfiguration{}
+	istioObject.Name = obj.Name
+	istioObject.Namespace = obj.Namespace
+
+	istioObject.Spec = istioOperatorApi.IstioConfigurationSpec{}
+	istioObject.Spec.Foo = importantValue + "_from_mothership"
+
+	err = r.Client.Create(ctx, &istioObject)
+	if err != nil {
+		logger.Error(err, "Error creating IstioConfiguration")
+		return ctrl.Result{}, err
+	}
+	logger.Info("Successfully created IstioConfiguration:", "object:", istioObject)
+
+	logger.Info("Successfully reconciled Kyma:", "object:", obj)
 
 	return ctrl.Result{}, nil
 }
