@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-
 	istioOperatorApi "github.com/Tomasz-Smelcerz-SAP/kyma-operator-istio/k8s-api/api/v1alpha1"
 	inventoryv1alpha1 "github.com/Tomasz-Smelcerz-SAP/kyma-operator-mothership/operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

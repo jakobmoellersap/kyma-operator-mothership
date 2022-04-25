@@ -20,15 +20,19 @@ import (
 	"context"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // WatcherReconciler reconciles a Watcher object
 type WatcherReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	WatcherClient *http.Client
 }
 
 //+kubebuilder:rbac:groups=inventory.kyma-project.io,resources=watchers,verbs=get;list;watch;create;update;patch;delete
@@ -51,9 +55,10 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	newConfigMap := &corev1.ConfigMap{}
 	err := r.Get(ctx, req.NamespacedName, newConfigMap)
 	if err != nil {
-		logger.Error(err, req.Name, "got deleted")
+		logger.Info("Configmap deleted:", "name", req.Name)
 	}
-	logger.Info("Configmap get updated:" + newConfigMap.Name)
+	logger.Info("Configmap updated:", "name", newConfigMap.Name)
+	//r.WatcherClient.Post("http://localhost:8080", "application/json", json.Marshal())
 	return ctrl.Result{}, nil
 }
 
@@ -61,10 +66,34 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *WatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
-		//Watches(
-		//	&source.Kind{Type: &corev1.ConfigMap{}},
-		//	&handler.EnqueueRequestForObject{},
-		//	,
-		//).
+		WithEventFilter(labelFilterPredicate()).
 		Complete(r)
+}
+
+func labelFilterPredicate() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			labels := e.ObjectNew.GetLabels()
+			if isWatchedByMothership(labels) {
+				return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+			}
+			return false
+		},
+		GenericFunc: func(genericEvent event.GenericEvent) bool {
+			return false
+		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
+			labels := deleteEvent.Object.GetLabels()
+			return isWatchedByMothership(labels)
+		},
+		CreateFunc: func(createEvent event.CreateEvent) bool {
+			labels := createEvent.Object.GetLabels()
+			return isWatchedByMothership(labels)
+		},
+	}
+}
+
+func isWatchedByMothership(labels map[string]string) bool {
+	value, found := labels["kyma-project.io/watched-by"]
+	return found && value == "mothership"
 }
