@@ -6,6 +6,14 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - inventory.kyma-project.io
   resources:
   - kymas
@@ -27,6 +35,32 @@ rules:
   - inventory.kyma-project.io
   resources:
   - kymas/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - inventory.kyma-project.io
+  resources:
+  - watchers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - inventory.kyma-project.io
+  resources:
+  - watchers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - inventory.kyma-project.io
+  resources:
+  - watchers/status
   verbs:
   - get
   - patch

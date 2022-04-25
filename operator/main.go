@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	istioOperatorApi "github.com/Tomasz-Smelcerz-SAP/kyma-operator-istio/k8s-api/api/v1alpha1"
+
 	inventoryv1alpha1 "github.com/Tomasz-Smelcerz-SAP/kyma-operator-mothership/operator/api/v1alpha1"
 	"github.com/Tomasz-Smelcerz-SAP/kyma-operator-mothership/operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -86,6 +87,13 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kyma")
+		os.Exit(1)
+	}
+	if err = (&controllers.WatcherReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Watcher")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

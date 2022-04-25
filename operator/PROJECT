@@ -13,4 +13,9 @@ resources:
   kind: Kyma
   path: github.com/Tomasz-Smelcerz-SAP/kyma-operator-mothership/operator/api/v1alpha1
   version: v1alpha1
+- controller: true
+  domain: kyma-project.io
+  group: inventory
+  kind: Watcher
+  version: v1alpha1
 version: "3"
