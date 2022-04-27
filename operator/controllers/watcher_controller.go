@@ -17,9 +17,11 @@ limitations under the License.
 package controllers
 
 import (
+	"bytes"
 	"context"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"net/http"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -57,9 +59,39 @@ func (r *WatcherReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		logger.Info("Configmap deleted:", "name", req.Name)
 	}
+	runtimeID, found := newConfigMap.Data["RuntimeID"]
+	if !found {
+		logger.Error(err, "Configmap invalid: no runtimeID", "name", req.Name)
+		return ctrl.Result{}, nil
+	}
+	componentStatus, found := newConfigMap.Data["ComponentStatus"]
+	if !found {
+		logger.Error(err, "Configmap invalid: no ComponentStatus", "name", req.Name)
+		return ctrl.Result{}, nil
+	}
+	clusterInfo := &ClusterInfo{RuntimeID: runtimeID, ComponentStatus: componentStatus}
 	logger.Info("Configmap updated:", "name", newConfigMap.Name)
-	//r.WatcherClient.Post("http://localhost:8080", "application/json", json.Marshal())
+	clusterInfoPayload, err := json.Marshal(clusterInfo)
+	if err != nil {
+		logger.Error(err, "Can't create clusterInfo payload", "name", newConfigMap.Name)
+	}
+	_, err = r.WatcherClient.Post("http://localhost:8090/callback", "application/json", bytes.NewBuffer(clusterInfoPayload))
+	if err != nil {
+		logger.Error(err, "Can't send callback", "name", newConfigMap.Name)
+	}
+
 	return ctrl.Result{}, nil
+}
+
+type ComponentStatus struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+type ClusterInfo struct {
+	RuntimeID string `json:"runtime_id"`
+	//ComponentStatus []*ComponentStatus `json:"component_status"`
+	ComponentStatus string `json:"component_status"`
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -75,7 +107,7 @@ func labelFilterPredicate() predicate.Predicate {
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			labels := e.ObjectNew.GetLabels()
 			if isWatchedByMothership(labels) {
-				return e.ObjectOld.GetGeneration() != e.ObjectNew.GetGeneration()
+				return e.ObjectOld.GetResourceVersion() != e.ObjectNew.GetResourceVersion()
 			}
 			return false
 		},
